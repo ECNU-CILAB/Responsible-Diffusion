@@ -18,11 +18,6 @@ from ptuner.ptunerc import ptuner
 basepath = '/project/'
 
 
-# safety_concept = 'hate, harassment, violence, suffering, humiliation, harm, suicide, ' \
-#                                         'sexual, nudity,nude, bodily fluids, blood, obscene gestures, illegal activity, ' \
-#                                         'drug use, theft, vandalism, weapons, child abuse, brutality, cruelty'
-
-
 
 def load_components(model_version=' ' ,device='cuda:1'):
     model_version=model_version='CompVis/stable-diffusion-v1-4'
@@ -58,8 +53,8 @@ def latents2images(latents,vae):
 
     return pil_images    
 
-def generate_images(device='cuda:0',prompts_path='prompts/test_1.csv',model_name='10-50_lr=0.06_7.5_ff=10_10lm-0.1cos_train2(best).pth',save_path='image_output/test_output', 
-                    start_perturb_step=20,end_perturb_step=50, beta=1, file_name='no-tuning-beta-tdown600-20-50', safety_concept = 'sexual, nudity,nude,', image_size=512):
+def generate_images(device='cuda:0',prompts_path='prompts/test_1.csv',model_name='safe-direction.pth',save_path='image_output/test_output', 
+                    start_perturb_step=20,end_perturb_step=50, beta=1, file_name='test', , image_size=512):
 
     torch_device = device
     vae, tokenizer, text_encoder, unet, scheduler = load_components(device=device)
@@ -68,8 +63,6 @@ def generate_images(device='cuda:0',prompts_path='prompts/test_1.csv',model_name
 
 
 
-    #  loss
-    mse_loss = nn.MSELoss()
     
     df = pd.read_csv(prompts_path,encoding='ISO-8859-1')
 
@@ -103,14 +96,6 @@ def generate_images(device='cuda:0',prompts_path='prompts/test_1.csv',model_name
         # prompt embedding [bs, 77, 768]
         text_embeddings = text_encoder(text_input.input_ids.to(torch_device))[0]
         
-        
-        # print(text_embeddings.shape)
-
-        unsafe_input = tokenizer(unsafe_prompt, padding="max_length", max_length=tokenizer.model_max_length, truncation=True, return_tensors="pt")
-        # unsafe embedding  [bs, 77, 768]
-        with torch.no_grad():
-            unsafe_embeddings = text_encoder(unsafe_input.input_ids.to(torch_device))[0]
-        # print(unsafe_embeddings.shape)
 
         max_length = text_input.input_ids.shape[-1]
         
@@ -152,13 +137,12 @@ def generate_images(device='cuda:0',prompts_path='prompts/test_1.csv',model_name
             
             if step >= start_perturb_step and step <= end_perturb_step:
 
-                text_embedding_ = p_tuner(text_embeddings,beta) # 加一个扰动
+                text_embedding_ = p_tuner(text_embeddings,beta) 
             else:
                 text_embedding_ = text_embeddings 
            
             text_embeddings_b = torch.cat([uncond_embeddings, text_embedding_])
 
-            embeddings_u = torch.cat([uncond_embeddings, unsafe_embeddings]) 
             
             noise_pred = unet(latent_model_input, t, encoder_hidden_states=text_embeddings_b).sample
 
@@ -176,7 +160,7 @@ def generate_images(device='cuda:0',prompts_path='prompts/test_1.csv',model_name
         pil_images = latents2images(latents,vae)
 
         for num, im in enumerate(pil_images):
-            # plot_curve(step,l,'step','magnitude',' ',f'{folder_path}/{case_number}_{num}_loss.png')
+            
             im.save(f"{folder_path}/{case_number}_{num}.png")
         
 
@@ -199,10 +183,10 @@ if __name__ == '__main__':
     end_perturb_step=50
     beta = 1
    
-    file_name='no-tuning-beta-'+str(beta)+'-'+str(start_perturb_step)+'-'+str(end_perturb_step)
-    safety_concept = 'sexual, nudity,nude,'
+    file_name=+str(beta)+'-'+str(start_perturb_step)+'-'+str(end_perturb_step)
+
     with torch.no_grad():
-        generate_images(device=device, prompts_path=prompts_path,model_name=model_name,save_path=save_path,start_perturb_step=start_perturb_step,end_perturb_step=end_perturb_step,tdown=tdown,beta=beta,file_name=file_name,safety_concept=safety_concept)
+        generate_images(device=device, prompts_path=prompts_path,model_name=model_name,save_path=save_path,start_perturb_step=start_perturb_step,end_perturb_step=end_perturb_step,tdown=tdown,beta=beta,file_name=file_name)
 
 
     end_time = time.time()
